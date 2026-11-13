@@ -8,6 +8,8 @@ Loop 步骤（对应笔试题要求）：
   Step four  根据情况继续 loop（再调 LLM）或把最终答案返回给用户
 
 安全阀：MAX_ITERATIONS 防止模型无限调用工具死循环。
+输出解析：一轮 LLM 回复按三类处理——思考过程（reasoning，只进 trace）、
+          工具调用（tool_calls，执行后回填 role=tool）、最终答案（content，返回用户）。
 异常处理：工具错误 → 作为 tool result 喂回 LLM；LLM 错误 → 友好文案返回用户。
 Trace：每一轮写 logs/trace.jsonl + 控制台摘要。
 """
@@ -81,6 +83,21 @@ class Agent:
 
             tool_calls = assistant_msg.get("tool_calls") or []
 
+            # 解析 LLM 输出：思考过程 / 工具调用 / 最终答案，三类都要能被区分出来。
+            # reasoning 字段各家长得不完全一样（DeepSeek 用 reasoning_content，
+            # 部分兼容实现用 reasoning），统一取一次。
+            thinking = assistant_msg.get("reasoning_content") or assistant_msg.get("reasoning") or ""
+            if thinking:
+                if self.verbose:
+                    first_line = thinking.strip().splitlines()[0] if thinking.strip() else ""
+                    print(f"  💭 [thinking] {first_line[:80]}")
+                # 思考过程只进 trace，不回填 context：一是部分模型不接受回传
+                # reasoning 字段（会 400），二是思考文本通常比答案还长，回填会加速 context 爆炸
+                self.trace.log(session.session_id, {
+                    "iter": iteration, "event": "llm_thinking",
+                    "thinking": thinking[:300],
+                })
+
             if not tool_calls:
                 # Step four：模型给出最终答案，loop 结束
                 content = assistant_msg.get("content") or ""
@@ -94,7 +111,10 @@ class Agent:
                 return content
 
             # Step three：执行工具
-            session.append(assistant_msg)  # assistant 的 tool_calls 消息必须先进 history
+            # assistant 的 tool_calls 消息必须先进 history，且必须去掉 reasoning 字段——
+            # 下一轮请求原样带回去，不少 OpenAI-compatible 服务会直接 400
+            session.append({k: v for k, v in assistant_msg.items()
+                            if k not in ("reasoning_content", "reasoning")})
             for tc in tool_calls:
                 fn = tc.get("function", {})
                 name = fn.get("name", "")

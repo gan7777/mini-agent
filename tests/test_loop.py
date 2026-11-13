@@ -90,3 +90,35 @@ def test_invalid_args_fed_back_not_crash(tmp_path):
     agent.run(session, "算个数")
     tool_msg = [m for m in session.messages if m["role"] == "tool"][0]
     assert "参数校验失败" in tool_msg["content"]
+
+
+def test_thinking_extracted_to_trace_not_fed_back(tmp_path):
+    """题目要求"提取思考过程"：reasoning 只进 trace，不回填 context。
+
+    不回填的理由：①部分 OpenAI-compatible 服务不接受回传 reasoning 字段（会 400）
+    ②思考文本常常比答案更长，回填会加速 context 膨胀。
+    """
+    from agent.loop import TraceLogger
+
+    agent = Agent(
+        llm=MockLLM([
+            {**tool_call_msg("calculator", {"expression": "2+2"}),
+             "reasoning_content": "用户在问加法，应该调 calculator"},
+            text_msg("2+2 等于 4。"),
+        ]),
+        registry=build_default_registry(),
+        store=SessionStore(base_dir=str(tmp_path / "sessions")),
+        context_manager=ContextManager(MockLLM([])),
+        trace=TraceLogger(log_dir=str(tmp_path / "logs")),
+        verbose=False,
+    )
+    session = agent.store.get("th1")
+    agent.run(session, "2+2 是多少")
+
+    raw = open(agent.trace.path, encoding="utf-8").read()
+    assert "llm_thinking" in raw and "calculator" in raw
+    # history 与下一轮请求里都不能残留 reasoning 字段
+    for m in session.messages:
+        assert "reasoning_content" not in m and "reasoning" not in m
+    second_call = agent.llm.calls[1]["messages"]
+    assert all("reasoning_content" not in m for m in second_call)

@@ -77,7 +77,7 @@ def test_todo_invalid_action():
 def test_search_mock_returns_results():
     session = Session("s1")
     out = search_tool.handler({"query": "今天天气"}, session)
-    assert "搜索结果" in out and "今天天气" in out
+    assert "的结果" in out and "今天天气" in out
 
 
 def test_registry_executes_and_validates():

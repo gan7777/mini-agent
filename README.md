@@ -6,6 +6,15 @@ GitHub: https://github.com/gan7777/mini-agent
 agent loop、工具注册（JSON Schema 驱动 function calling）、多 session 管理、
 context 压缩、工具调用 trace。
 
+提交物导航：
+
+| 部分 | 位置 |
+|---|---|
+| Vibe coding 代码 | 本仓库 `agent/` `main.py` `tests/` |
+| README（运行方式 / 系统设计 / memory 召回时机与放置） | 本文件 |
+| AI Prompt 与问题解决记录 | [docs/ai-log.md](docs/ai-log.md) |
+| 架构设计题（5 模块各选一题） | [docs/architecture.md](docs/architecture.md) |
+
 ## 运行方式
 
 ```bash
@@ -47,7 +56,7 @@ pytest tests/ -q
    - 想聊天：右键 `main.py → Run 'main'`，控制台里直接输入对话。
    - 想带会话：`Run → Edit Configurations → Parameters` 填 `--session-id window-1`，
      再复制一份配置改成 `window-2`，就能开两个窗口演示隔离。
-   - 想跑测试：右键 `tests` 目录 → `Run 'pytest in tests'`，应看到 26 passed。
+   - 想跑测试：右键 `tests` 目录 → `Run 'pytest in tests'`，应看到 27 passed。
    - 想跑端到端演示：右键 `scripts/smoke_test.py → Run`，会自动验证 todo/追问/计算/搜索/隔离/持久化。
 
 **关于 API key**（代码零密钥，两种方式任选）：
@@ -88,7 +97,7 @@ pytest tests/ -q
 
 | 模块 | 职责 | 关键决策 |
 |---|---|---|
-| `agent/loop.py` | Agent 核心循环 | 终止条件=无 tool_calls 或达 `MAX_ITERATIONS`（防死循环）；工具结果以 `role=tool` 回填后继续 loop |
+| `agent/loop.py` | Agent 核心循环 + 输出解析 | 一轮 LLM 回复分三类处理：思考过程（`reasoning_content`，只进 trace、不回填 context，避免 400 和 context 膨胀）、工具调用（执行后以 `role=tool` 回填）、最终答案（返回用户）；终止条件=无 tool_calls 或达 `MAX_ITERATIONS`（防死循环） |
 | `agent/llm.py` | LLM 客户端 | 手写 httpx 调 OpenAI-compatible 接口（不用 SDK）；超时+2次重试；4xx 不重试直接报错 |
 | `agent/tools/registry.py` | 工具注册机制 | Tool = name/description/JSON Schema/handler；参数校验失败**不 crash**，错误信息作为 tool result 喂回 LLM 让它自行纠正 |
 | `agent/tools/todo.py` | 必做工具 | 单工具带 action 参数（add/list/complete）；状态挂 session 上，天然按窗口隔离+落盘 |
@@ -148,7 +157,7 @@ mini-agent/
 │       ├── todo.py      # 待办（必做）
 │       ├── calculator.py# ast 安全计算
 │       └── search.py    # mock 搜索
-├── tests/               # 26 个测试，MockLLM 驱动，零 API key 依赖
+├── tests/               # 27 个测试，MockLLM 驱动，零 API key 依赖
 ├── docs/ai-log.md       # AI 使用记录
 ├── main.py              # CLI 入口
 └── logs/trace.jsonl     # 运行时自动生成的工具调用 trace
