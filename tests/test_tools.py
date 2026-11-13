@@ -41,6 +41,21 @@ def test_calculator_zero_division():
     assert "无法计算" in calculator_tool.handler({"expression": "1/0"}, session)
 
 
+def test_calculator_rejects_pow_bomb():
+    """ast 白名单挡不住「合法但算不完」的表达式，必须有规模上限。"""
+    session = Session("c4")
+    # 9**9**9 是合法算术，但会让进程卡死；上限生效后应立即返回错误
+    assert "无法计算" in calculator_tool.handler({"expression": "9**9**9"}, session)
+    # 正常量级的幂仍要能用
+    assert "2**10 = 1024" in calculator_tool.handler({"expression": "2**10"}, session)
+
+
+def test_calculator_rejects_overlong_expression():
+    session = Session("c5")
+    out = calculator_tool.handler({"expression": "1+" * 200 + "1"}, session)
+    assert "表达式过长" in out
+
+
 def test_todo_flow():
     session = Session("t1")
     assert "已添加待办 #1" in todo_tool.handler({"action": "add", "content": "写周报"}, session)

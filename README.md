@@ -47,7 +47,7 @@ pytest tests/ -q
    - 想聊天：右键 `main.py → Run 'main'`，控制台里直接输入对话。
    - 想带会话：`Run → Edit Configurations → Parameters` 填 `--session-id window-1`，
      再复制一份配置改成 `window-2`，就能开两个窗口演示隔离。
-   - 想跑测试：右键 `tests` 目录 → `Run 'pytest in tests'`，应看到 24 passed。
+   - 想跑测试：右键 `tests` 目录 → `Run 'pytest in tests'`，应看到 26 passed。
    - 想跑端到端演示：右键 `scripts/smoke_test.py → Run`，会自动验证 todo/追问/计算/搜索/隔离/持久化。
 
 **关于 API key**（代码零密钥，两种方式任选）：
@@ -92,7 +92,7 @@ pytest tests/ -q
 | `agent/llm.py` | LLM 客户端 | 手写 httpx 调 OpenAI-compatible 接口（不用 SDK）；超时+2次重试；4xx 不重试直接报错 |
 | `agent/tools/registry.py` | 工具注册机制 | Tool = name/description/JSON Schema/handler；参数校验失败**不 crash**，错误信息作为 tool result 喂回 LLM 让它自行纠正 |
 | `agent/tools/todo.py` | 必做工具 | 单工具带 action 参数（add/list/complete）；状态挂 session 上，天然按窗口隔离+落盘 |
-| `agent/tools/calculator.py` | 计算工具 | ast 安全求值，拒绝任意代码注入（不用裸 eval） |
+| `agent/tools/calculator.py` | 计算工具 | ast 安全求值，拒绝任意代码注入（不用裸 eval）；幂运算另设指数/底数上限，防 `9**9**9` 这类「合法但算不完」的表达式拖死进程 |
 | `agent/tools/search.py` | 搜索工具 | mock 实现，但走完整真实工具链路；换真实 API 只需改 handler |
 | `agent/session.py` | Session 管理 | 每 session 一个 json，原子写入（tmp+replace）；session_id 净化防路径逃逸 |
 | `agent/context.py` | Context 管理 | 估算 token 超阈值→旧消息 LLM 摘要替换（system 永远保留，最近 N 条原样）；摘要失败降级为截断式摘要，不阻断对话 |
@@ -148,7 +148,7 @@ mini-agent/
 │       ├── todo.py      # 待办（必做）
 │       ├── calculator.py# ast 安全计算
 │       └── search.py    # mock 搜索
-├── tests/               # 24 个测试，MockLLM 驱动，零 API key 依赖
+├── tests/               # 26 个测试，MockLLM 驱动，零 API key 依赖
 ├── docs/ai-log.md       # AI 使用记录
 ├── main.py              # CLI 入口
 └── logs/trace.jsonl     # 运行时自动生成的工具调用 trace
